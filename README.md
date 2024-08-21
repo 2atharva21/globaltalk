@@ -1,4 +1,4 @@
-# global_chat_app
+# globetalk
 
 A new Flutter project.
 
