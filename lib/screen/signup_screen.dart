@@ -44,41 +44,91 @@ class _SignupScreenState extends State<SignupScreen>
   }
 
   Future<void> createAccount() async {
-    try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email.text,
-        password: password.text,
-      );
-
-      var userId = FirebaseAuth.instance.currentUser!.uid;
-      var db = FirebaseFirestore.instance;
-
-      Map<String, dynamic> data = {
-        'name': name.text.trim(),
-        'country': country.text.trim(),
-        'email': email.text.trim(),
-        'id': userId,
-      };
-
+    if (userForm.currentState!.validate()) {
       try {
-        await db.collection("users").doc(userId).set(data);
+        UserCredential userCredential =
+            await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email.text,
+          password: password.text,
+        );
+
+        var userId = userCredential.user!.uid;
+        var db = FirebaseFirestore.instance;
+
+        Map<String, dynamic> data = {
+          'name': name.text.trim(),
+          'country': country.text.trim(),
+          'email': email.text.trim(),
+          'id': userId,
+        };
+
+        try {
+          await db.collection("users").doc(userId).set(data);
+        } catch (e) {
+          print("Error saving user data: $e");
+        }
+
+        // Show the success message with Snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.blueAccent,
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 24),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Account created successfully, ${name.text}!',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            duration: Duration(seconds: 3),
+          ),
+        );
+
+        // Navigate to the next screen after showing the message
+        Timer(Duration(seconds: 3), () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const SplaceScreen()),
+          );
+        });
+
+        print('Account created successfully');
       } catch (e) {
-        print("Error saving user data: $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.white,
+            content: Container(
+              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+              child: Row(
+                children: [
+                  Icon(Icons.error, color: Colors.redAccent, size: 24),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      e.toString(),
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.0),
+            ),
+            margin: EdgeInsets.all(16),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        print(e);
       }
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const SplaceScreen()),
-      );
-
-      print('Account created successfully');
-    } catch (e) {
-      final SnackBar messageSnackbar = SnackBar(
-        backgroundColor: Colors.redAccent,
-        content: Text(e.toString()),
-      );
-      ScaffoldMessenger.of(context).showSnackBar(messageSnackbar);
-      print(e);
     }
   }
 
@@ -93,8 +143,8 @@ class _SignupScreenState extends State<SignupScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sign Up'),
-        foregroundColor: Colors.white,
         backgroundColor: Colors.blueAccent,
+        foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -130,7 +180,7 @@ class _SignupScreenState extends State<SignupScreen>
                 Text(
                   'Fill in the details below to get started',
                   style: textTheme.bodyMedium?.copyWith(
-                    color: Colors.blueGrey,
+                    color: Colors.grey[600],
                   ),
                 ),
                 const SizedBox(height: 30),
@@ -218,9 +268,7 @@ class _SignupScreenState extends State<SignupScreen>
                             isLoading = true;
                           });
                           _animationController.forward().then((_) {
-                            if (userForm.currentState!.validate()) {
-                              createAccount();
-                            }
+                            createAccount();
                             _animationController.reverse();
                           }).whenComplete(() {
                             setState(() {
@@ -248,7 +296,9 @@ class _SignupScreenState extends State<SignupScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text('Already have an account?',
-                        style: textTheme.bodyMedium),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                        )),
                     const SizedBox(width: 8),
                     InkWell(
                       onTap: () {
@@ -298,9 +348,13 @@ class _SignupScreenState extends State<SignupScreen>
           borderRadius: BorderRadius.circular(12.0),
         ),
         filled: true,
-        fillColor: Colors.blueGrey[50],
+        fillColor: Colors.grey[200],
+        errorStyle: TextStyle(
+          color: Colors.redAccent,
+          fontWeight: FontWeight.w500,
+          fontSize: 14,
+        ),
       ),
     );
   }
 }
-

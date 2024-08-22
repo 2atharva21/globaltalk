@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:global_chat_app/provider/userprovider.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
 class ChatroomScreen extends StatefulWidget {
   final String chatroomName;
@@ -11,6 +12,7 @@ class ChatroomScreen extends StatefulWidget {
     super.key,
     required this.chatroomName,
     required this.chatroomId,
+    required receiverName,
   });
 
   @override
@@ -127,6 +129,7 @@ class _ChatroomScreenState extends State<ChatroomScreen> {
                 }
 
                 var allMessages = snapshot.data!.docs;
+                DateTime? lastMessageDate;
 
                 return ListView.builder(
                   reverse: true,
@@ -144,148 +147,216 @@ class _ChatroomScreenState extends State<ChatroomScreen> {
                     bool isSentByCurrentUser =
                         messageData["sender_name"] == currentUserName;
                     String? replyToMessageId = messageData["reply_to"];
+                    Timestamp timestamp = messageData["timestamp"] as Timestamp;
+                    DateTime messageDate = timestamp.toDate();
+                    String formattedTime =
+                        DateFormat('h:mm a').format(messageDate);
 
-                    return GestureDetector(
-                      onDoubleTap: () {
-                        _setReplyMessage({
-                          'id': messageId,
-                          'text': messageData['text'],
-                          'sender_name': messageData['sender_name']
-                        });
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 4.0, horizontal: 12.0),
-                        child: Column(
-                          crossAxisAlignment: isSentByCurrentUser
-                              ? CrossAxisAlignment.end
-                              : CrossAxisAlignment.start,
-                          children: [
-                            if (replyToMessageId != null) ...[
-                              FutureBuilder<DocumentSnapshot>(
-                                future: db
-                                    .collection('messages')
-                                    .doc(replyToMessageId)
-                                    .get(),
-                                builder: (context, replySnapshot) {
-                                  if (!replySnapshot.hasData ||
-                                      !replySnapshot.data!.exists) {
-                                    return SizedBox.shrink();
-                                  }
+                    // Show date separator if date has changed
+                    bool showDateSeparator = lastMessageDate == null ||
+                        messageDate.day != lastMessageDate?.day ||
+                        messageDate.month != lastMessageDate?.month ||
+                        messageDate.year != lastMessageDate?.year;
 
-                                  var replyMessageData = replySnapshot.data!
-                                      .data() as Map<String, dynamic>;
+                    if (showDateSeparator) {
+                      lastMessageDate = messageDate;
+                    }
 
-                                  return Container(
-                                    color: Colors.grey[200],
-                                    padding: const EdgeInsets.all(8),
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    child: Text(
-                                      "Replying to: ${replyMessageData['text']}",
-                                      style: TextStyle(color: Colors.black87),
-                                    ),
-                                  );
-                                },
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (showDateSeparator)
+                          Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            alignment: Alignment.center,
+                            child: Text(
+                              DateFormat('MMMM d, yyyy').format(messageDate),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
                               ),
-                            ],
-                            Row(
-                              mainAxisAlignment: isSentByCurrentUser
-                                  ? MainAxisAlignment.end
-                                  : MainAxisAlignment.start,
+                            ),
+                          ),
+                        GestureDetector(
+                          onDoubleTap: () {
+                            _setReplyMessage({
+                              'id': messageId,
+                              'text': messageData['text'],
+                              'sender_name': messageData['sender_name']
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 4.0, horizontal: 12.0),
+                            child: Column(
+                              crossAxisAlignment: isSentByCurrentUser
+                                  ? CrossAxisAlignment.end
+                                  : CrossAxisAlignment.start,
                               children: [
-                                if (!isSentByCurrentUser) ...[
-                                  CircleAvatar(
-                                    backgroundColor: Colors.grey[600],
-                                    foregroundColor: Colors.white,
-                                    radius: 16,
-                                    child: Text(
-                                      messageData["sender_name"]!.isNotEmpty
-                                          ? messageData["sender_name"]![0]
-                                              .toUpperCase()
-                                          : '',
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                ],
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: isSentByCurrentUser
-                                        ? Colors.blueAccent
-                                        : Colors.grey[300],
-                                    borderRadius: BorderRadius.only(
-                                      topLeft: const Radius.circular(16),
-                                      topRight: const Radius.circular(16),
-                                      bottomLeft: isSentByCurrentUser
-                                          ? const Radius.circular(16)
-                                          : Radius.zero,
-                                      bottomRight: isSentByCurrentUser
-                                          ? Radius.zero
-                                          : const Radius.circular(16),
-                                    ),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 10.0, horizontal: 16.0),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      if (!isSentByCurrentUser)
-                                        Text(
-                                          messageData["sender_name"] ??
-                                              "Unknown",
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.black87),
+                                if (replyToMessageId != null) ...[
+                                  FutureBuilder<DocumentSnapshot>(
+                                    future: db
+                                        .collection('messages')
+                                        .doc(replyToMessageId)
+                                        .get(),
+                                    builder: (context, replySnapshot) {
+                                      if (!replySnapshot.hasData ||
+                                          !replySnapshot.data!.exists) {
+                                        return SizedBox.shrink();
+                                      }
+
+                                      var replyMessageData = replySnapshot.data!
+                                          .data() as Map<String, dynamic>;
+
+                                      return AnimatedOpacity(
+                                        opacity: 1.0,
+                                        duration:
+                                            const Duration(milliseconds: 300),
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[200],
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          padding: const EdgeInsets.all(8),
+                                          margin:
+                                              const EdgeInsets.only(bottom: 8),
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Icon(
+                                                Icons.reply,
+                                                color: Colors.blueAccent,
+                                                size: 20,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      "Replying to:",
+                                                      style: TextStyle(
+                                                        color:
+                                                            Colors.blueAccent,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      replyMessageData['text'],
+                                                      style: TextStyle(
+                                                        color: Colors.black87,
+                                                      ),
+                                                      overflow:
+                                                          TextOverflow.visible,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        messageData["text"],
-                                        style: TextStyle(
-                                          color: isSentByCurrentUser
-                                              ? Colors.white
-                                              : Colors.black87,
+                                      );
+                                    },
+                                  ),
+                                ],
+                                Row(
+                                  mainAxisAlignment: isSentByCurrentUser
+                                      ? MainAxisAlignment.end
+                                      : MainAxisAlignment.start,
+                                  children: [
+                                    if (!isSentByCurrentUser) ...[
+                                      CircleAvatar(
+                                        backgroundColor: Colors.grey[600],
+                                        foregroundColor: Colors.white,
+                                        radius: 16,
+                                        child: Text(
+                                          messageData["sender_name"]!.isNotEmpty
+                                              ? messageData["sender_name"]![0]
+                                                  .toUpperCase()
+                                              : '',
+                                          style: const TextStyle(fontSize: 14),
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        messageData["timestamp"] != null
-                                            ? (messageData["timestamp"]
-                                                    as Timestamp)
-                                                .toDate()
-                                                .toLocal()
-                                                .toString()
-                                            : '',
-                                        style: TextStyle(
-                                          color: isSentByCurrentUser
-                                              ? Colors.white
-                                              : Colors.grey[600],
-                                          fontSize: 12,
+                                      const SizedBox(width: 8),
+                                    ],
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: isSentByCurrentUser
+                                            ? Colors.blueAccent
+                                            : Colors.grey[300],
+                                        borderRadius: BorderRadius.only(
+                                          topLeft: const Radius.circular(16),
+                                          topRight: const Radius.circular(16),
+                                          bottomLeft: isSentByCurrentUser
+                                              ? const Radius.circular(16)
+                                              : Radius.zero,
+                                          bottomRight: isSentByCurrentUser
+                                              ? Radius.zero
+                                              : const Radius.circular(16),
+                                        ),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12.0, horizontal: 16.0),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          if (!isSentByCurrentUser)
+                                            Text(
+                                              messageData["sender_name"] ??
+                                                  "Unknown",
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black87),
+                                            ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            messageData["text"],
+                                            style: TextStyle(
+                                              color: isSentByCurrentUser
+                                                  ? Colors.white
+                                                  : Colors.black87,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            formattedTime,
+                                            style: TextStyle(
+                                              color: isSentByCurrentUser
+                                                  ? Colors.white
+                                                  : Colors.grey[600],
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (isSentByCurrentUser) ...[
+                                      const SizedBox(width: 8),
+                                      CircleAvatar(
+                                        backgroundColor: Colors.grey[600],
+                                        foregroundColor: Colors.white,
+                                        radius: 16,
+                                        child: Text(
+                                          messageData["sender_name"]!.isNotEmpty
+                                              ? messageData["sender_name"]![0]
+                                                  .toUpperCase()
+                                              : '',
+                                          style: const TextStyle(fontSize: 14),
                                         ),
                                       ),
                                     ],
-                                  ),
+                                  ],
                                 ),
-                                if (isSentByCurrentUser) ...[
-                                  const SizedBox(width: 8),
-                                  CircleAvatar(
-                                    backgroundColor: Colors.grey[600],
-                                    foregroundColor: Colors.white,
-                                    radius: 16,
-                                    child: Text(
-                                      messageData["sender_name"]!.isNotEmpty
-                                          ? messageData["sender_name"]![0]
-                                              .toUpperCase()
-                                          : '',
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                  ),
-                                ],
                               ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     );
                   },
                 );
@@ -310,7 +381,10 @@ class _ChatroomScreenState extends State<ChatroomScreen> {
           children: [
             if (_replyMessageData != null) ...[
               Container(
-                color: Colors.grey[200],
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 padding: const EdgeInsets.all(8),
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Row(
